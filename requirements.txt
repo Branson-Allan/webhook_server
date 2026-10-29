@@ -1,0 +1,16 @@
+# CRM Webhook: runtime dependencies
+#
+# This project uses only the Python standard library (http.server, sqlite3,
+# hmac, hashlib, json, ...), so there are no third-party packages to install.
+#
+# Requirements:
+#   Python  >= 3.10   (uses `X | None` type hints)
+#   SQLite  >= 3.24   (uses INSERT ... ON CONFLICT upserts; bundled with Python 3.10+ builds)
+#
+# Setup (optional virtual environment):
+#   python3 -m venv .venv
+#   source .venv/bin/activate          # Windows: .venv\Scripts\activate
+#   pip install -r requirements.txt    # installs nothing, safe to run
+#
+# Run:   copy .env.example to .env, set CLIENT_SECRET, then: python app.py
+# Test:  python -m unittest discover -v
