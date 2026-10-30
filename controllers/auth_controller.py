@@ -5,7 +5,11 @@ from views.token_view import TokenView
 
 
 class AuthController:
-    """Token endpoint: the 'URL' the CRM calls for dynamic authorization."""
+    """Authorization URL: the CRM calls this (GET or POST) to obtain an access token.
+
+    Client credentials may arrive as HTTP Basic, a JSON body, a form body, or
+    ?client_id=...&client_secret=... in the URL itself.
+    """
 
     def __init__(self, auth_service: AuthService, view: TokenView):
         self._auth = auth_service
@@ -22,10 +26,14 @@ class AuthController:
         basic = request.basic_credentials()
         if basic:
             return basic
-        if request.content_type == "application/json":
-            data = request.json()
-            if not isinstance(data, dict):
-                raise BadRequest("Body must be a JSON object")
-        else:
-            data = request.form()
-        return data.get("client_id"), data.get("client_secret")
+        data = {}
+        if request.body.strip():
+            if request.content_type == "application/json":
+                data = request.json()
+                if not isinstance(data, dict):
+                    raise BadRequest("Body must be a JSON object")
+            else:
+                data = request.form()
+        client_id = data.get("client_id") or request.query.get("client_id")
+        client_secret = data.get("client_secret") or request.query.get("client_secret")
+        return client_id, client_secret

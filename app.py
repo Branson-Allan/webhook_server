@@ -34,13 +34,16 @@ def build_application(config: Config, resources=None) -> Application:
     tokens.create_table()
 
     # Services & middleware
-    auth = AuthService(tokens, config.client_id, config.client_secret, config.token_ttl)
+    auth = AuthService(tokens, config.client_id, config.client_secret, config.token_ttl,
+                       static_token=config.static_token)
     require_token = BearerAuth(auth)
 
     # Fixed routes
+    auth_ctrl = AuthController(auth, TokenView())
     router = (Router()
               .get("/health", HealthController(HealthView()).index)
-              .post("/auth/token", AuthController(auth, TokenView()).token))
+              .add("GET", "/auth/token", auth_ctrl.token)
+              .add("POST", "/auth/token", auth_ctrl.token))
 
     # One generic endpoint per Resource
     for resource in resources:
@@ -60,6 +63,8 @@ def main():
     config = Config.from_env()
     if config.uses_default_secret:
         logging.warning("Using the default CLIENT_SECRET. Copy .env.example to .env and set your own.")
+    if config.static_token and len(config.static_token) < 24:
+        logging.warning("STATIC_ACCESS_TOKEN is short. Use at least 24 random characters.")
     app = build_application(config)
     server = HttpServer(app, config.host, config.port, config.max_body_bytes)
     logging.info("Listening on http://%s:%s", config.host, server.port)

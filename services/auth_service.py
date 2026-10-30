@@ -16,12 +16,14 @@ class IssuedToken:
 
 class AuthService:
     def __init__(self, tokens: TokenRepository, client_id: str,
-                 client_secret: str, token_ttl: int, clock=time.time):
+                 client_secret: str, token_ttl: int, clock=time.time,
+                 static_token: str = ""):
         self._tokens = tokens
         self._client_id = client_id.encode()
         self._client_secret = client_secret.encode()
         self._ttl = token_ttl
         self._clock = clock
+        self._static = static_token.encode()    # b"" = feature disabled
 
     def verify_client(self, client_id, client_secret) -> bool:
         if client_id is None or client_secret is None:
@@ -37,6 +39,8 @@ class AuthService:
         return IssuedToken(value, self._ttl)
 
     def is_token_valid(self, token: str) -> bool:
+        if self._static and hmac.compare_digest(token.encode(), self._static):
+            return True                          # fixed token from .env
         expires_at = self._tokens.expiry_of(self._hash(token))
         return expires_at is not None and expires_at > self._clock()
 
