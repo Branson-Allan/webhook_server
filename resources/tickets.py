@@ -22,6 +22,8 @@ RESOURCE = Resource(
         "location": StringField(),
         "age": StringField(),
         "status": StringField(),
+        "subject": StringField(),
+        "priority": StringField(),
         "source": StringField(),
         "category": StringField(),
         "disposition": StringField(),
