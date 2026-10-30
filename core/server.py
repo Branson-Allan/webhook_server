@@ -1,10 +1,21 @@
 """Adapter between the stdlib HTTP server and Application."""
 import logging
+import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs
 
 from core.application import Application
 from core.exceptions import BadRequest, HttpError, PayloadTooLarge
 from core.http import Request, Response
+
+
+_SECRET_PARAMS = re.compile(
+    r"(?i)\b(client_secret|access_token|token|api_key|secret)=[^&\s\"']+")
+
+
+def redact(text: str) -> str:
+    """Hide secret query-string values before they reach the logs."""
+    return _SECRET_PARAMS.sub(lambda m: f"{m.group(1)}=***", text)
 
 
 class HttpServer:
@@ -53,8 +64,10 @@ class HttpServer:
                     self._discard(min(length, max_body * 10))
                     raise PayloadTooLarge()
                 body = self.rfile.read(length) if length else b""
-                return Request(self.command, self.path.split("?", 1)[0],
-                               self.headers, body)
+                path, _, query_string = self.path.partition("?")
+                query = {k: v[0] for k, v in
+                         parse_qs(query_string, keep_blank_values=True).items()}
+                return Request(self.command, path, self.headers, body, query)
 
             def _discard(self, remaining: int):
                 while remaining > 0:
@@ -72,6 +85,6 @@ class HttpServer:
                 self.wfile.write(response.body)
 
             def log_message(self, fmt, *args):
-                log.info("%s - %s", self.address_string(), fmt % args)
+                log.info("%s - %s", self.address_string(), redact(fmt % args))
 
         return Handler

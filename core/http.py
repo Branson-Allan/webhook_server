@@ -13,6 +13,7 @@ class Request:
     path: str
     headers: dict
     body: bytes = b""
+    query: dict = field(default_factory=dict)
 
     def __post_init__(self):
         self.headers = {k.lower(): v for k, v in self.headers.items()}
@@ -39,10 +40,18 @@ class Request:
     def form(self) -> dict:
         return {k: v[0] for k, v in parse_qs(self.text()).items()}
 
-    def bearer_token(self):
-        scheme, _, value = (self.header("authorization") or "").partition(" ")
-        value = value.strip()
-        return value if scheme.lower() == "bearer" and value else None
+    def access_token(self):
+        """The caller's token, however the CRM sends it:
+        'Authorization: Bearer <t>', 'Authorization: Token <t>',
+        a bare 'Authorization: <t>', or an 'X-Access-Token: <t>' header."""
+        auth = (self.header("authorization") or "").strip()
+        if auth:
+            scheme, _, value = auth.partition(" ")
+            if value.strip() and scheme.lower() in ("bearer", "token"):
+                return value.strip()
+            if " " not in auth:
+                return auth
+        return (self.header("x-access-token") or "").strip() or None
 
     def basic_credentials(self):
         scheme, _, value = (self.header("authorization") or "").partition(" ")

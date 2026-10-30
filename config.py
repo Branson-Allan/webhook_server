@@ -53,6 +53,7 @@ class Config:
     port: int = 8000
     db_path: str = "tickets.db"
     max_body_bytes: int = 1_000_000
+    static_token: str = ""      # optional fixed access token (see .env.example)
 
     @classmethod
     def from_env(cls, environ=None, env_file=None) -> "Config":
@@ -68,6 +69,7 @@ class Config:
             port=int(get("PORT", cls.port)),
             db_path=get("DB_PATH", cls.db_path),
             max_body_bytes=int(get("MAX_BODY_BYTES", cls.max_body_bytes)),
+            static_token=get("STATIC_ACCESS_TOKEN", cls.static_token),
         )
 
     @property

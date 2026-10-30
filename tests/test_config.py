@@ -46,6 +46,11 @@ class TestEnvFile(unittest.TestCase):
         cfg = Config.from_env(environ={"CLIENT_ID": "fromenv"}, env_file=path)
         self.assertEqual((cfg.client_id, cfg.client_secret), ("fromenv", "abc123"))
 
+    def test_static_token_setting(self):
+        cfg = Config.from_env(environ={"STATIC_ACCESS_TOKEN": "abc"}, env_file="/no/such/.env")
+        self.assertEqual(cfg.static_token, "abc")
+        self.assertEqual(Config.from_env(environ={}, env_file="/no/such/.env").static_token, "")
+
     def test_defaults_when_nothing_set(self):
         cfg = Config.from_env(environ={}, env_file="/no/such/.env")
         self.assertEqual((cfg.client_secret, cfg.port), (DEFAULT_SECRET, 8000))

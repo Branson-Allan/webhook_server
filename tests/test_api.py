@@ -308,5 +308,64 @@ class TestResourceRegistry(unittest.TestCase):
             Resource("ok", fields={"raw_payload": StringField()})
 
 
+class TestTokenTransports(ServerFixture, unittest.TestCase):
+    """The CRM form only has an Authorization URL and an Access Token."""
+
+    def test_get_with_credentials_in_url(self):
+        code, body, headers = self.call("GET", "/auth/token?client_id=crm&client_secret=s3cret")
+        self.assertEqual(code, 200)
+        self.assertTrue(body["access_token"] == body["token"] == body["accessToken"])
+        self.assertEqual(headers["Cache-Control"], "no-store")
+
+    def test_get_without_credentials_is_401(self):
+        self.assertEqual(self.call("GET", "/auth/token")[0], 401)
+        self.assertEqual(self.call("GET", "/auth/token?client_id=crm&client_secret=bad")[0], 401)
+
+    def test_post_with_empty_body_and_url_credentials(self):
+        code, _, _ = self.call("POST", "/auth/token?client_id=crm&client_secret=s3cret", raw=b"")
+        self.assertEqual(code, 200)
+
+    def test_token_route_allows_get_and_post_only(self):
+        code, _, headers = self.call("PUT", "/auth/token", raw=b"")
+        self.assertEqual((code, headers["Allow"]), (405, "GET, POST"))
+
+    def test_webhook_accepts_any_token_style(self):
+        t = self.token()
+        for headers in ({"Authorization": f"Bearer {t}"}, {"Authorization": f"bearer {t}"},
+                        {"Authorization": f"Token {t}"}, {"Authorization": t},
+                        {"X-Access-Token": t}):
+            code, _, _ = self.call("POST", "/webhook/tickets", {"ticket_id": "H-1"}, headers)
+            self.assertIn(code, (200, 201), headers)
+        self.assertEqual(self.call("POST", "/webhook/tickets", {"ticket_id": "H-1"},
+                                   {"Authorization": "Basic abc"})[0], 401)
+
+    def test_query_string_on_webhook_url_is_ignored_for_routing(self):
+        code, _, _ = self.call("POST", "/webhook/tickets?source=crm", {"ticket_id": "Q-1"},
+                               self.auth())
+        self.assertEqual(code, 201)
+
+    def test_secrets_are_redacted_in_logs(self):
+        from core.server import redact
+        line = '"GET /auth/token?client_id=crm&client_secret=s3cret&x=1 HTTP/1.1" 200'
+        self.assertNotIn("s3cret", redact(line))
+        self.assertIn("client_id=crm", redact(line))
+
+
+class TestStaticToken(ServerFixture, unittest.TestCase):
+    overrides = {"static_token": "static-token-for-tests-0123456789"}
+
+    def test_fixed_token_works_without_logging_in(self):
+        h = {"Authorization": "Bearer static-token-for-tests-0123456789"}
+        self.assertEqual(self.call("POST", "/webhook/tickets", {"ticket_id": "S-1"}, h)[0], 201)
+
+    def test_wrong_fixed_token_rejected(self):
+        h = {"Authorization": "Bearer static-token-for-tests-WRONG"}
+        self.assertEqual(self.call("POST", "/webhook/tickets", {"ticket_id": "S-2"}, h)[0], 401)
+
+    def test_dynamic_tokens_still_work(self):
+        self.assertEqual(self.call("POST", "/webhook/tickets", {"ticket_id": "S-3"},
+                                   self.auth())[0], 201)
+
+
 if __name__ == "__main__":
     unittest.main()
