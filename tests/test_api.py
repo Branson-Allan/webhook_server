@@ -265,6 +265,28 @@ class TestExpiredToken(ServerFixture, unittest.TestCase):
         self.assertEqual(self.call("POST", "/webhook/tickets", SAMPLE, self.auth())[0], 401)
 
 
+class TestAuthDisabled(ServerFixture, unittest.TestCase):
+    """AUTH_ENABLED=false -> every webhook ingests data without any token."""
+    overrides = {"auth_enabled": False}
+    resources = discover()      # includes the real tickets resource
+
+    def test_protected_resource_ingests_without_token(self):
+        code, body, _ = self.call("POST", "/webhook/tickets", SAMPLE)
+        self.assertEqual(code, 201)
+        self.assertEqual(body["message"], "Ticket created")
+
+    def test_still_accepts_valid_bearer_token(self):
+        code, _, _ = self.call("POST", "/webhook/tickets", SAMPLE, self.auth())
+        self.assertEqual(code, 200)   # same ticket_id -> update
+
+    def test_auth_token_endpoint_still_works(self):
+        code, body, _ = self.call(
+            "POST", "/auth/token", None,
+            {"Authorization": "Basic " + base64.b64encode(b"crm:s3cret").decode()})
+        self.assertEqual(code, 200)
+        self.assertIn("access_token", body)
+
+
 class TestSchemaMigration(unittest.TestCase):
     def test_new_fields_become_columns_without_losing_data(self):
         with tempfile.TemporaryDirectory() as tmp:
