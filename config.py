@@ -19,7 +19,9 @@ def parse_env_file(path) -> dict:
 
     Supported: KEY=value, KEY="quoted value", KEY='quoted value', `export KEY=value`,
     blank lines, full-line # comments, and trailing ' # comment' on unquoted values
-    (quote the value if it must contain ' #').
+    (quote the value if it must contain ' #').  Lines that are not valid assignments
+    (e.g. text accidentally pasted into the file) are skipped with a warning instead
+    of crashing the whole app at startup.
     """
     path = Path(path)
     values: dict = {}
@@ -34,7 +36,9 @@ def parse_env_file(path) -> dict:
         key, sep, value = line.partition("=")
         key = key.strip()
         if not sep or not key.isidentifier():
-            raise ValueError(f"{path}:{number}: expected KEY=VALUE")
+            print(f"WARNING: {path}:{number}: ignoring malformed line "
+                  f"(expected KEY=VALUE): {raw!r}")
+            continue
         value = value.strip()
         if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
             value = value[1:-1]
@@ -42,6 +46,19 @@ def parse_env_file(path) -> dict:
             value = re.split(r"\s+#", value, maxsplit=1)[0].rstrip()
         values[key] = value
     return values
+
+
+def _int_setting(env, key, default):
+    """Read an integer setting; fall back to the default with a warning if the
+    value is malformed (e.g. text accidentally pasted after it in .env)."""
+    raw = env.get(key)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        print(f"WARNING: {key}={raw!r} is not a valid integer; using default {default}")
+        return default
 
 
 @dataclass(frozen=True)
@@ -64,11 +81,11 @@ class Config:
         return cls(
             client_id=get("CLIENT_ID", cls.client_id),
             client_secret=get("CLIENT_SECRET", cls.client_secret),
-            token_ttl=int(get("TOKEN_TTL", cls.token_ttl)),
+            token_ttl=_int_setting(env, "TOKEN_TTL", cls.token_ttl),
             host=get("HOST", cls.host),
-            port=int(get("PORT", cls.port)),
+            port=_int_setting(env, "PORT", cls.port),
             db_path=get("DB_PATH", cls.db_path),
-            max_body_bytes=int(get("MAX_BODY_BYTES", cls.max_body_bytes)),
+            max_body_bytes=_int_setting(env, "MAX_BODY_BYTES", cls.max_body_bytes),
             static_token=get("STATIC_ACCESS_TOKEN", cls.static_token),
         )
 

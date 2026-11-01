@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from config import Config, DEFAULT_SECRET, parse_env_file
 
@@ -26,10 +27,15 @@ class TestEnvFile(unittest.TestCase):
             "CLIENT_ID": "crm", "CLIENT_SECRET": "se cret # not a comment",
             "PORT": "9000", "DB_PATH": "my.db", "EMPTY": ""})
 
-    def test_invalid_line_reports_line_number(self):
-        path = self.write("CLIENT_ID=crm\nthis is wrong\n")
-        with self.assertRaisesRegex(ValueError, ":2:"):
-            parse_env_file(path)
+    def test_invalid_line_is_skipped_with_warning(self):
+        # Malformed lines (e.g. text accidentally pasted into .env) must not
+        # crash startup; they are skipped with a warning naming the line number.
+        path = self.write("CLIENT_ID=crm\nthis is wrong\nPORT=9000\n")
+        with patch("builtins.print") as fake_print:
+            values = parse_env_file(path)
+        self.assertEqual(values, {"CLIENT_ID": "crm", "PORT": "9000"})
+        warned = " ".join(str(c) for c in fake_print.call_args_list)
+        self.assertIn(":2:", warned)
 
     def test_missing_file_is_fine(self):
         self.assertEqual(parse_env_file("/no/such/.env"), {})
