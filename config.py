@@ -10,7 +10,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-DEFAULT_SECRET = "change-me-please"
+DEFAULT_SECRET = "branson1234"
 DEFAULT_ENV_FILE = Path(__file__).resolve().parent / ".env"
 
 
