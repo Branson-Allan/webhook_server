@@ -11,6 +11,13 @@ Settings priority: real environment variables > `.env` file > built-in defaults.
 
 Auth: `POST /auth/token` (client_id + client_secret) -> Bearer token for every protected webhook.
 
+**No auth needed?** Set `AUTH_ENABLED=false` in `.env` and every webhook ingests data
+with no token at all (the `/auth/token` endpoint keeps working, and valid Bearer
+tokens are still accepted). Warning: anyone who can reach the URL can write data —
+only disable auth on a trusted/private network or behind another gate (e.g. ngrok
+basic auth / IP allowlist). Per-endpoint control is also available via
+`protected=False` on a single Resource.
+
 ## 1. Send extra, unplanned keys
 Just send them. Any key not declared in the resource's schema is saved as JSON in the
 `extra_fields` column, and the response lists them under `extra_fields_stored`.

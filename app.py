@@ -37,6 +37,9 @@ def build_application(config: Config, resources=None) -> Application:
     auth = AuthService(tokens, config.client_id, config.client_secret, config.token_ttl,
                        static_token=config.static_token)
     require_token = BearerAuth(auth)
+    if not config.auth_enabled:
+        log.warning("AUTH_ENABLED is false: webhooks will ingest data WITHOUT any "
+                    "token. Only do this on a trusted/private network.")
 
     # Fixed routes
     auth_ctrl = AuthController(auth, TokenView())
@@ -51,7 +54,8 @@ def build_application(config: Config, resources=None) -> Application:
         repository.create_table()
         controller = ResourceController(resource, repository, ResourceView())
         router.post(resource.path, controller.store,
-                    middleware=[require_token] if resource.protected else [])
+                    middleware=[require_token]
+                    if resource.protected and config.auth_enabled else [])
         log.info("Registered POST %s (table %s, extra keys: %s)",
                  resource.path, resource.table, resource.extra)
 

@@ -48,6 +48,20 @@ def parse_env_file(path) -> dict:
     return values
 
 
+_TRUTHY = {"1", "true", "yes", "on"}
+
+
+def _bool_setting(env, key, default: bool) -> bool:
+    """Read a boolean setting (case-insensitive: 1/true/yes/on are True)."""
+    raw = env.get(key)
+    if raw is None:
+        return default
+    value = str(raw).strip().lower()
+    if value in ("", "0", "false", "no", "off"):
+        return not default if value == "" else value in _TRUTHY
+    return value in _TRUTHY
+
+
 def _int_setting(env, key, default):
     """Read an integer setting; fall back to the default with a warning if the
     value is malformed (e.g. text accidentally pasted after it in .env)."""
@@ -71,6 +85,7 @@ class Config:
     db_path: str = "tickets.db"
     max_body_bytes: int = 1_000_000
     static_token: str = ""      # optional fixed access token (see .env.example)
+    auth_enabled: bool = True   # False = webhooks ingest data without any token
 
     @classmethod
     def from_env(cls, environ=None, env_file=None) -> "Config":
@@ -87,6 +102,7 @@ class Config:
             db_path=get("DB_PATH", cls.db_path),
             max_body_bytes=_int_setting(env, "MAX_BODY_BYTES", cls.max_body_bytes),
             static_token=get("STATIC_ACCESS_TOKEN", cls.static_token),
+            auth_enabled=_bool_setting(env, "AUTH_ENABLED", cls.auth_enabled),
         )
 
     @property
